@@ -821,6 +821,21 @@ class SeparatedPathType(click.Path):
         return [super_convert(item, param, ctx) for item in items]
 
 
+def _validate_reloader_type(ctx, param, value):
+    if value not in {"auto", "stat", "watchdog"}:
+        raise click.BadParameter(
+            "--reloader-type can only be 'auto', 'stat' or 'watchdog'.", ctx, param
+        )
+    if value == "watchdog":
+        try:
+            __import__("watchdog.observers")
+        except ImportError as exc:
+            raise click.BadParameter(
+                "To use 'watchdog' reloader type 'watchdog' package must be installed.", ctx, param
+            ) from exc
+    return value
+
+
 @click.command("run", short_help="Run a development server.")
 @click.option("--host", "-h", default="127.0.0.1", help="The interface to bind to.")
 @click.option("--port", "-p", default=5000, help="The port to bind to.")
@@ -842,6 +857,12 @@ class SeparatedPathType(click.Path):
     default=None,
     help="Enable or disable the reloader. By default the reloader "
     "is active if debug is enabled.",
+)
+@click.option(
+    "--reloader-type",
+    default="auto",
+    help="Set reloader type, available: 'auto', 'stat', 'watchdog'.",
+    callback=_validate_reloader_type,
 )
 @click.option(
     "--debugger/--no-debugger",
@@ -879,6 +900,7 @@ def run_command(
     host,
     port,
     reload,
+    reloader_type,
     debugger,
     with_threads,
     cert,
@@ -925,6 +947,7 @@ def run_command(
         port,
         app,
         use_reloader=reload,
+        reloader_type=reloader_type,
         use_debugger=debugger,
         threaded=with_threads,
         ssl_context=cert,
